@@ -488,7 +488,7 @@ void i_loop(
     of.write((char *)&num, 4);
 }
 
-void i_chl(
+void i_shl(
     std ::vector<std::string> &v,
     std::map<std::string, uint64_t> &st,
     uint64_t spesymcnt,
@@ -507,7 +507,7 @@ void i_chl(
     of.write((char *)&ops, 1);
 }
 
-void i_chr(
+void i_shr(
     std ::vector<std::string> &v,
     std::map<std::string, uint64_t> &st,
     uint64_t spesymcnt,
@@ -958,8 +958,8 @@ std::function<
         i_sysc,
         i_sysr,
         i_loop,
-        i_chl,
-        i_chr,
+        i_shl,
+        i_shr,
         i_rol,
         i_ror,
         i_ldi,
