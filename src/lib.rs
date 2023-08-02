@@ -260,10 +260,36 @@ impl Assembler {
             };
             // 替换标号
             if let Some(((starts, length), name)) = self.refill_symbols.get(&(i as usize)) {
-                let addr = if let Some(addr) = address_table.get(name) {
-                    *addr
-                } else {
-                    panic!("Unknown symbol \"{}\"", name);
+                let addr = {
+                    if name == "n" {
+                        let mut x = i;
+                        let mut list: Vec<(&String, &u64)> = address_table.iter().collect();
+                        list.sort_by_key(|&(_, num)| num);
+                        while list[x as usize].0 != &(section.name.clone() + ".") {
+                            x += 1;
+                            if x as usize >= list.len() {
+                                panic!("There is no location symbol.");
+                            }
+                        }
+                        *list[x as usize].1
+                    } else if name == "p" {
+                        let mut x = i;
+                        let mut list: Vec<(&String, &u64)> = address_table.iter().collect();
+                        list.sort_by_key(|&(_, num)| num);
+                        while list[x as usize].0 != &(section.name.clone() + ".") {
+                            x -= 1;
+                            if x == 0 {
+                                panic!("There is no location symbol.");
+                            }
+                        }
+                        *list[x as usize].1
+                    } else {
+                        if let Some(addr) = address_table.get(name) {
+                            *addr
+                        } else {
+                            panic!("Unknown symbol \"{}\"", name);
+                        }
+                    }
                 };
                 // bytes sequence
                 let bseq = [
