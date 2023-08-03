@@ -131,7 +131,6 @@ impl Assembler {
                         &mut self.refill_symbols,
                         self.instruction_sequence.len(),
                     ));
-                    println!("{}", opcode);
                 }
             } else {
                 // 非指令
@@ -320,7 +319,6 @@ impl Assembler {
             };
             i += 1;
         }
-        println!("{:?}", address_table);
         // 生成目标代码
         i = 0;
         addr = 0;
@@ -367,8 +365,6 @@ impl Assembler {
             };
             // 替换标号
             if let Some(((starts, length), name)) = self.refill_symbols.get(&(i as usize)) {
-                println!("{},{:?}", i, self.refill_symbols.get(&(i as usize)));
-                println!("{},{:?}", i, inst);
                 let mut taddr = {
                     if name == "n" {
                         let mut x = i;
