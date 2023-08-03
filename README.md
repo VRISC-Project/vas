@@ -13,3 +13,7 @@
 ## 段声明
 
 `section <sec_name> [align=<bytes>] [starts=<addr>]`
+
+## 伪指令
+
+只取nasm的常量写入伪指令，`db`、`dw`、`dd`、`dq`。

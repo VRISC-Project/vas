@@ -18,7 +18,9 @@ pub enum ExeFormat {
     Sel,
 }
 
+/// 伪指令与正常指令共享此结构
 pub struct Instruction {
+    // 255代表这是伪指令，实际内容为oprands的内容
     pub opcode: u8,
     pub oprands: Vec<u8>,
 }
@@ -119,7 +121,7 @@ impl Assembler {
             };
             let mut line = line.iter().map(|s| s.to_string()).collect();
             if let Some(opcode) = opcode {
-                //指令
+                // 指令
                 if let Some(inst) = self.instruction_space[opcode as usize] {
                     self.instruction_sequence.push(inst(
                         line,
@@ -138,6 +140,90 @@ impl Assembler {
                         self.instruction_sequence.len(),
                         line[0].split_at(1).1.to_string(),
                     );
+                }
+                // 伪指令
+                else if line[0] == "db" {
+                    line.remove(0);
+                    for opr in line {
+                        let opr = &opr.as_bytes()[1..];
+                        let opr = String::from_utf8(opr.to_vec()).unwrap();
+                        let i = if opr.starts_with("$") {
+                            opr.parse::<u8>().unwrap()
+                        } else {
+                            self.refill_symbols
+                                .insert(self.instruction_sequence.len(), ((0, 1), opr));
+                            0
+                        };
+                        self.instruction_sequence.push(Instruction {
+                            opcode: u8::MAX,
+                            oprands: vec![i],
+                        });
+                    }
+                } else if line[0] == "dw" {
+                    line.remove(0);
+                    for opr in line {
+                        let opr = &opr.as_bytes()[1..];
+                        let opr = String::from_utf8(opr.to_vec()).unwrap();
+                        let i = if opr.starts_with("$") {
+                            opr.parse::<u16>().unwrap()
+                        } else {
+                            self.refill_symbols
+                                .insert(self.instruction_sequence.len(), ((0, 2), opr));
+                            0
+                        };
+                        self.instruction_sequence.push(Instruction {
+                            opcode: u8::MAX,
+                            oprands: vec![i as u8, (i >> 8) as u8],
+                        });
+                    }
+                } else if line[0] == "dd" {
+                    line.remove(0);
+                    for opr in line {
+                        let opr = &opr.as_bytes()[1..];
+                        let opr = String::from_utf8(opr.to_vec()).unwrap();
+                        let i = if opr.starts_with("$") {
+                            opr.parse::<u32>().unwrap()
+                        } else {
+                            self.refill_symbols
+                                .insert(self.instruction_sequence.len(), ((0, 2), opr));
+                            0
+                        };
+                        self.instruction_sequence.push(Instruction {
+                            opcode: u8::MAX,
+                            oprands: vec![
+                                i as u8,
+                                (i >> 8) as u8,
+                                (i >> 16) as u8,
+                                (i >> 24) as u8,
+                            ],
+                        });
+                    }
+                } else if line[0] == "dq" {
+                    line.remove(0);
+                    for opr in line {
+                        let opr = &opr.as_bytes()[1..];
+                        let opr = String::from_utf8(opr.to_vec()).unwrap();
+                        let i = if opr.starts_with("$") {
+                            opr.parse::<u64>().unwrap()
+                        } else {
+                            self.refill_symbols
+                                .insert(self.instruction_sequence.len(), ((0, 2), opr));
+                            0
+                        };
+                        self.instruction_sequence.push(Instruction {
+                            opcode: u8::MAX,
+                            oprands: vec![
+                                i as u8,
+                                (i >> 8) as u8,
+                                (i >> 16) as u8,
+                                (i >> 24) as u8,
+                                (i >> 32) as u8,
+                                (i >> 40) as u8,
+                                (i >> 48) as u8,
+                                (i >> 56) as u8,
+                            ],
+                        });
+                    }
                 } else if line[0] == "section" {
                     line.remove(0);
                     // 段声明
@@ -217,7 +303,11 @@ impl Assembler {
                 };
                 address_table.insert(symname, addr);
             }
-            addr += inst.oprands.len() as u64 + 1;
+            addr += if inst.opcode != u8::MAX {
+                inst.oprands.len() as u64 + 1
+            } else {
+                inst.oprands.len() as u64
+            };
             i += 1;
         }
         // 生成目标代码
@@ -306,11 +396,17 @@ impl Assembler {
                     inst.oprands[*starts + i] = bseq[i];
                 }
             }
-            result.push(inst.opcode);
+            if inst.opcode != u8::MAX {
+                result.push(inst.opcode);
+            }
             for i in inst.oprands.clone() {
                 result.push(i);
             }
-            addr += inst.oprands.len() as u64 + 1;
+            addr += if inst.opcode != u8::MAX {
+                inst.oprands.len() as u64 + 1
+            } else {
+                inst.oprands.len() as u64
+            };
             i += 1;
         }
         result
