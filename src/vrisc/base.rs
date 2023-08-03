@@ -1,7 +1,10 @@
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
-use crate::Instruction;
+use crate::{
+    utils::csparse::{is_number, CSParse},
+    Instruction,
+};
 
 pub const BASE_NMEMONICS: [Option<&str>; 64] = [
     Some("nop"),
@@ -89,10 +92,6 @@ pub const BASE_INSTRUCTIONS: [Option<
     Some(i_xor),
     None,
     None,
-    None,
-    None,
-    None,
-    None,
     Some(i_jc),
     Some(i_cc),
     Some(i_r),
@@ -101,15 +100,19 @@ pub const BASE_INSTRUCTIONS: [Option<
     Some(i_sysc),
     Some(i_sysr),
     None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
     Some(i_ldi),
     Some(i_ldm),
     Some(i_stm),
-    None,
     Some(i_in),
     Some(i_out),
-    None,
-    None,
-    None,
     None,
     None,
     None,
@@ -167,7 +170,7 @@ fn get_register_code(regstr: &str) -> u8 {
         panic!("Invalid register oprand {}.", regstr);
     } else {
         let reg = String::from_utf8(regstr.as_bytes().split_at(2).1.to_vec()).unwrap();
-        reg.parse()
+        reg.csparse()
             .expect(&format!("Invalid register oprand {}.", regstr))
     }
 }
@@ -398,54 +401,6 @@ pub fn i_xor(
     }
 }
 
-pub fn i_0e(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_0f(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_10(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_11(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_12(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_13(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
 pub fn i_jc(
     asm: Vec<String>,
     refill_table: &mut HashMap<usize, ((usize, usize), String)>,
@@ -454,47 +409,65 @@ pub fn i_jc(
     let w = get_wide(&asm[0]);
     let c = get_condition_code(&mut asm[0].clone()) << 4;
     if asm[1].starts_with("*") {
-        match w {
-            1 => {
-                refill_table.insert(
-                    inst_num,
-                    (
-                        (1, 2),
-                        String::from_utf8(asm[1].as_bytes().split_at(1).1.to_vec()).unwrap(),
-                    ),
-                );
-                Instruction {
-                    opcode: 0x14,
-                    oprands: vec![c | w, 0, 0],
+        let nn = String::from_utf8(asm[1].as_bytes()[1..].to_vec()).unwrap();
+        if !is_number(&nn) {
+            match w {
+                1 => {
+                    refill_table.insert(inst_num, ((1, 2), nn));
+                    Instruction {
+                        opcode: 0x10,
+                        oprands: vec![c | w, 0, 0],
+                    }
                 }
-            }
-            2 => {
-                refill_table.insert(
-                    inst_num,
-                    (
-                        (1, 4),
-                        String::from_utf8(asm[1].as_bytes().split_at(1).1.to_vec()).unwrap(),
-                    ),
-                );
-                Instruction {
-                    opcode: 0x14,
-                    oprands: vec![c | w, 0, 0, 0, 0],
+                2 => {
+                    refill_table.insert(inst_num, ((1, 4), nn));
+                    Instruction {
+                        opcode: 0x10,
+                        oprands: vec![c | w, 0, 0, 0, 0],
+                    }
                 }
-            }
-            3 => {
-                refill_table.insert(
-                    inst_num,
-                    (
-                        (1, 8),
-                        String::from_utf8(asm[1].as_bytes().split_at(1).1.to_vec()).unwrap(),
-                    ),
-                );
-                Instruction {
-                    opcode: 0x14,
-                    oprands: vec![c | w, 0, 0, 0, 0, 0, 0, 0, 0],
+                3 => {
+                    refill_table.insert(inst_num, ((1, 8), nn));
+                    Instruction {
+                        opcode: 0x10,
+                        oprands: vec![c | w, 0, 0, 0, 0, 0, 0, 0, 0],
+                    }
                 }
+                _ => panic!("Invalid opcode {}.", asm[0]),
             }
-            _ => panic!("Invalid opcode {}.", asm[0]),
+        } else {
+            let num: u64 = nn.csparse().unwrap();
+            match w {
+                1 => Instruction {
+                    opcode: 0x10,
+                    oprands: vec![c | w, num as u8, (num >> 8) as u8],
+                },
+                2 => Instruction {
+                    opcode: 0x10,
+                    oprands: vec![
+                        c | w,
+                        num as u8,
+                        (num >> 8) as u8,
+                        (num >> 16) as u8,
+                        (num >> 24) as u8,
+                    ],
+                },
+                3 => Instruction {
+                    opcode: 0x10,
+                    oprands: vec![
+                        c | w,
+                        num as u8,
+                        (num >> 8) as u8,
+                        (num >> 16) as u8,
+                        (num >> 24) as u8,
+                        (num >> 32) as u8,
+                        (num >> 40) as u8,
+                        (num >> 48) as u8,
+                        (num >> 56) as u8,
+                    ],
+                },
+                _ => panic!("Invalid opcode {}.", asm[0]),
+            }
         }
     } else {
         panic!("Invalid oprand {} for jc.", asm[1]);
@@ -509,50 +482,68 @@ pub fn i_cc(
     let w = get_wide(&asm[0]);
     let c = get_condition_code(&mut asm[0].clone()) << 4;
     if asm[1].starts_with("*") {
-        match w {
-            1 => {
-                refill_table.insert(
-                    inst_num,
-                    (
-                        (1, 2),
-                        String::from_utf8(asm[1].as_bytes().split_at(1).1.to_vec()).unwrap(),
-                    ),
-                );
-                Instruction {
-                    opcode: 0x14,
-                    oprands: vec![c | w, 0, 0],
+        let nn = String::from_utf8(asm[1].as_bytes()[1..].to_vec()).unwrap();
+        if !is_number(&nn) {
+            match w {
+                1 => {
+                    refill_table.insert(inst_num, ((1, 2), nn));
+                    Instruction {
+                        opcode: 0x11,
+                        oprands: vec![c | w, 0, 0],
+                    }
                 }
-            }
-            2 => {
-                refill_table.insert(
-                    inst_num,
-                    (
-                        (1, 4),
-                        String::from_utf8(asm[1].as_bytes().split_at(1).1.to_vec()).unwrap(),
-                    ),
-                );
-                Instruction {
-                    opcode: 0x14,
-                    oprands: vec![c | w, 0, 0, 0, 0],
+                2 => {
+                    refill_table.insert(inst_num, ((1, 4), nn));
+                    Instruction {
+                        opcode: 0x11,
+                        oprands: vec![c | w, 0, 0, 0, 0],
+                    }
                 }
-            }
-            3 => {
-                refill_table.insert(
-                    inst_num,
-                    (
-                        (1, 8),
-                        String::from_utf8(asm[1].as_bytes().split_at(1).1.to_vec()).unwrap(),
-                    ),
-                );
-                Instruction {
-                    opcode: 0x14,
-                    oprands: vec![c | w, 0, 0, 0, 0, 0, 0, 0, 0],
+                3 => {
+                    refill_table.insert(inst_num, ((1, 8), nn));
+                    Instruction {
+                        opcode: 0x11,
+                        oprands: vec![c | w, 0, 0, 0, 0, 0, 0, 0, 0],
+                    }
                 }
+                _ => panic!("Invalid opcode {}.", asm[0]),
             }
-            _ => panic!("Invalid opcode {}.", asm[0]),
+        } else {
+            let num: u64 = nn.csparse().unwrap();
+            match w {
+                1 => Instruction {
+                    opcode: 0x11,
+                    oprands: vec![c | w, num as u8, (num >> 8) as u8],
+                },
+                2 => Instruction {
+                    opcode: 0x11,
+                    oprands: vec![
+                        c | w,
+                        num as u8,
+                        (num >> 8) as u8,
+                        (num >> 16) as u8,
+                        (num >> 24) as u8,
+                    ],
+                },
+                3 => Instruction {
+                    opcode: 0x11,
+                    oprands: vec![
+                        c | w,
+                        num as u8,
+                        (num >> 8) as u8,
+                        (num >> 16) as u8,
+                        (num >> 24) as u8,
+                        (num >> 32) as u8,
+                        (num >> 40) as u8,
+                        (num >> 48) as u8,
+                        (num >> 56) as u8,
+                    ],
+                },
+                _ => panic!("Invalid opcode {}.", asm[0]),
+            }
         }
     } else {
-        panic!("Invalid oprand {} for cc.", asm[1]);
+        panic!("Invalid oprand {} for jc.", asm[1]);
     }
 }
 
@@ -562,7 +553,7 @@ pub fn i_r(
     _inst_num: usize,
 ) -> Instruction {
     Instruction {
-        opcode: 0x16,
+        opcode: 0x12,
         oprands: vec![],
     }
 }
@@ -572,16 +563,29 @@ pub fn i_loop(
     refill_table: &mut HashMap<usize, ((usize, usize), String)>,
     inst_num: usize,
 ) -> Instruction {
-    refill_table.insert(
-        inst_num,
-        (
-            (2, 4),
-            String::from_utf8(asm[2].as_bytes().split_at(1).1.to_vec()).unwrap(),
-        ),
-    );
-    Instruction {
-        opcode: 0x17,
-        oprands: vec![get_register_code(&asm[1]), 0, 0, 0, 0],
+    if asm[2].starts_with("*") {
+        let nn = String::from_utf8(asm[2].as_bytes().split_at(1).1.to_vec()).unwrap();
+        if !is_number(&nn) {
+            refill_table.insert(inst_num, ((1, 4), nn));
+            Instruction {
+                opcode: 0x13,
+                oprands: vec![get_register_code(&asm[1]), 0, 0, 0, 0],
+            }
+        } else {
+            let num: u64 = nn.csparse().unwrap();
+            Instruction {
+                opcode: 0x13,
+                oprands: vec![
+                    get_register_code(&asm[1]),
+                    num as u8,
+                    (num >> 8) as u8,
+                    (num >> 16) as u8,
+                    (num >> 24) as u8,
+                ],
+            }
+        }
+    } else {
+        panic!("Invalid oprand {} for loop.", asm[2]);
     }
 }
 
@@ -590,10 +594,13 @@ pub fn i_ir(
     _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
     _inst_num: usize,
 ) -> Instruction {
+    let opr = asm[1].to_string();
+    let opr = opr.as_bytes()[1..].to_vec();
+    let opr = String::from_utf8(opr).unwrap();
     Instruction {
-        opcode: 0x18,
-        oprands: vec![asm[1]
-            .parse()
+        opcode: 0x14,
+        oprands: vec![opr
+            .csparse()
             .expect(&format!("Invalid oprand {} for 'ir'.", asm[1]))],
     }
 }
@@ -604,7 +611,7 @@ pub fn i_sysc(
     _inst_num: usize,
 ) -> Instruction {
     Instruction {
-        opcode: 0x19,
+        opcode: 0x15,
         oprands: vec![],
     }
 }
@@ -615,17 +622,9 @@ pub fn i_sysr(
     _inst_num: usize,
 ) -> Instruction {
     Instruction {
-        opcode: 0x1a,
+        opcode: 0x16,
         oprands: vec![],
     }
-}
-
-pub fn i_1b(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
 }
 
 pub fn i_ldi(
@@ -635,34 +634,44 @@ pub fn i_ldi(
 ) -> Instruction {
     let w = get_wide(&asm[0]);
     let r = get_register_code(&asm[2]) << 4;
-    if asm[1].starts_with("$") {
-        refill_table.insert(
-            inst_num,
-            (
-                (2, 2 ^ w as usize),
-                String::from_utf8(asm[1].as_bytes().split_at(1).1.to_vec()).unwrap(),
-            ),
-        );
-    } else {
-        panic!("Invalid oprand {}.", asm[1]);
+    if !asm[1].starts_with("$") {
+        panic!("Invalid oprand {} for ldi.", asm[1]);
     }
+    let nn = String::from_utf8(asm[1].as_bytes().split_at(1).1.to_vec()).unwrap();
+    let num: u64 = nn.parse().unwrap();
     match w {
         0 => Instruction {
-            opcode: 0x1c,
-            oprands: vec![r | w, 0],
+            opcode: 0x20,
+            oprands: vec![r | w, num as u8],
         },
 
         1 => Instruction {
-            opcode: 0x1c,
-            oprands: vec![r | w, 0, 0],
+            opcode: 0x20,
+            oprands: vec![r | w, num as u8, (num >> 8) as u8],
         },
         2 => Instruction {
-            opcode: 0x1c,
-            oprands: vec![r | w, 0, 0, 0, 0],
+            opcode: 0x20,
+            oprands: vec![
+                r | w,
+                num as u8,
+                (num >> 8) as u8,
+                (num >> 16) as u8,
+                (num >> 24) as u8,
+            ],
         },
         3 => Instruction {
-            opcode: 0x1c,
-            oprands: vec![r | w, 0, 0, 0, 0, 0, 0, 0, 0],
+            opcode: 0x20,
+            oprands: vec![
+                r | w,
+                (num >> 8) as u8,
+                (num >> 16) as u8,
+                (num >> 24) as u8,
+                (num >> 32) as u8,
+                (num >> 40) as u8,
+                (num >> 48) as u8,
+                (num >> 56) as u8,
+                0,
+            ],
         },
         _ => todo!(),
     }
@@ -674,7 +683,7 @@ pub fn i_ldm(
     _inst_num: usize,
 ) -> Instruction {
     Instruction {
-        opcode: 0x1d,
+        opcode: 0x21,
         oprands: vec![
             get_register_code(&asm[2]) << 4 | get_register_code(&asm[1]),
             get_wide(&asm[0]),
@@ -688,20 +697,12 @@ pub fn i_stm(
     _inst_num: usize,
 ) -> Instruction {
     Instruction {
-        opcode: 0x1d,
+        opcode: 0x22,
         oprands: vec![
             get_register_code(&asm[2]) << 4 | get_register_code(&asm[1]),
             get_wide(&asm[0]),
         ],
     }
-}
-
-pub fn i_1f(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
 }
 
 pub fn i_in(
@@ -718,118 +719,6 @@ pub fn i_out(
     _inst_num: usize,
 ) -> Instruction {
     todo!(); //TODO
-}
-
-pub fn i_22(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_23(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_24(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_25(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_26(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_27(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_28(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_29(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_2a(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_2b(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_2c(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_2d(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_2e(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
-}
-
-pub fn i_2f(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
 }
 
 pub fn i_ei(

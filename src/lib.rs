@@ -7,9 +7,11 @@ use std::{
 
 use config::Config;
 use elf_utilities::{header::Ehdr64, Elf64Half};
+use utils::csparse::CSParse;
 use vrisc::base::{BASE_INSTRUCTIONS, BASE_NMEMONICS};
 
 pub mod config;
+pub mod utils;
 pub mod vrisc;
 
 pub enum ExeFormat {
@@ -19,6 +21,7 @@ pub enum ExeFormat {
 }
 
 /// 伪指令与正常指令共享此结构
+#[derive(Debug)]
 pub struct Instruction {
     // 255代表这是伪指令，实际内容为oprands的内容
     pub opcode: u8,
@@ -107,10 +110,10 @@ impl Assembler {
                 }
                 // 条件跳转指令需特殊处理
                 if line[0].starts_with("j") {
-                    i = 0x14;
+                    i = 0x10;
                 }
                 if line[0].starts_with("c") && line[0] != "cpuid" {
-                    i = 0x15;
+                    i = 0x11;
                 }
 
                 if i as usize == BASE_NMEMONICS.len() {
@@ -128,6 +131,7 @@ impl Assembler {
                         &mut self.refill_symbols,
                         self.instruction_sequence.len(),
                     ));
+                    println!("{}", opcode);
                 }
             } else {
                 // 非指令
@@ -147,8 +151,8 @@ impl Assembler {
                     for opr in line {
                         let opr = &opr.as_bytes()[1..];
                         let opr = String::from_utf8(opr.to_vec()).unwrap();
-                        let i = if opr.starts_with("$") {
-                            opr.parse::<u8>().unwrap()
+                        let i: u8 = if opr.starts_with("$") {
+                            opr.csparse().unwrap()
                         } else {
                             self.refill_symbols
                                 .insert(self.instruction_sequence.len(), ((0, 1), opr));
@@ -164,8 +168,8 @@ impl Assembler {
                     for opr in line {
                         let opr = &opr.as_bytes()[1..];
                         let opr = String::from_utf8(opr.to_vec()).unwrap();
-                        let i = if opr.starts_with("$") {
-                            opr.parse::<u16>().unwrap()
+                        let i: u16 = if opr.starts_with("$") {
+                            opr.csparse().unwrap()
                         } else {
                             self.refill_symbols
                                 .insert(self.instruction_sequence.len(), ((0, 2), opr));
@@ -181,8 +185,8 @@ impl Assembler {
                     for opr in line {
                         let opr = &opr.as_bytes()[1..];
                         let opr = String::from_utf8(opr.to_vec()).unwrap();
-                        let i = if opr.starts_with("$") {
-                            opr.parse::<u32>().unwrap()
+                        let i: u32 = if opr.starts_with("$") {
+                            opr.csparse().unwrap()
                         } else {
                             self.refill_symbols
                                 .insert(self.instruction_sequence.len(), ((0, 2), opr));
@@ -203,8 +207,8 @@ impl Assembler {
                     for opr in line {
                         let opr = &opr.as_bytes()[1..];
                         let opr = String::from_utf8(opr.to_vec()).unwrap();
-                        let i = if opr.starts_with("$") {
-                            opr.parse::<u64>().unwrap()
+                        let i: u64 = if opr.starts_with("$") {
+                            opr.csparse().unwrap()
                         } else {
                             self.refill_symbols
                                 .insert(self.instruction_sequence.len(), ((0, 2), opr));
@@ -239,10 +243,10 @@ impl Assembler {
                         };
                         match *attr {
                             "starts" => {
-                                starts = val.parse().unwrap();
+                                starts = val.csparse().unwrap();
                             }
                             "align" => {
-                                align = val.parse().unwrap();
+                                align = val.csparse().unwrap();
                             }
                             _ => (),
                         }
@@ -275,7 +279,7 @@ impl Assembler {
         let mut i = 0u64;
         let mut addr = 0u64;
         let mut address_table: HashMap<String, u64> = HashMap::new();
-        let mut section = &Section {
+        let mut section = &mut Section {
             name: "null".to_string(),
             starts: 0,
             align: 8,
@@ -283,7 +287,13 @@ impl Assembler {
         // 计算段及标号的地址
         for inst in self.instruction_sequence.as_slice() {
             if let Some(sec) = self.sections_table.get(&(i as usize)) {
-                section = sec.clone();
+                section.name = sec.name.clone();
+                if sec.starts != 0 {
+                    section.starts = sec.starts;
+                }
+                if sec.align != 0 {
+                    section.align = sec.align;
+                }
                 if section.starts != 0 && addr <= section.starts {
                     addr = section.starts;
                 }
@@ -310,19 +320,26 @@ impl Assembler {
             };
             i += 1;
         }
+        println!("{:?}", address_table);
         // 生成目标代码
         i = 0;
         addr = 0;
-        let binding = Section {
+        let mut binding = Section {
             name: "null".to_string(),
             starts: 0,
             align: 8,
         };
-        section = &binding;
+        section = &mut binding;
         let mut result = Vec::new();
         for inst in self.instruction_sequence.as_slice() {
             if let Some(sec) = self.sections_table.get(&(i as usize)) {
-                section = sec.clone();
+                section.name = sec.name.clone();
+                if sec.starts != 0 {
+                    section.starts = sec.starts;
+                }
+                if sec.align != 0 {
+                    section.align = sec.align;
+                }
                 if section.starts != 0 && addr <= section.starts {
                     for _ in 0..(section.starts - addr) {
                         result.push(0);
@@ -350,7 +367,9 @@ impl Assembler {
             };
             // 替换标号
             if let Some(((starts, length), name)) = self.refill_symbols.get(&(i as usize)) {
-                let addr = {
+                println!("{},{:?}", i, self.refill_symbols.get(&(i as usize)));
+                println!("{},{:?}", i, inst);
+                let mut taddr = {
                     if name == "n" {
                         let mut x = i;
                         let mut list: Vec<(&String, &u64)> = address_table.iter().collect();
@@ -381,16 +400,25 @@ impl Assembler {
                         }
                     }
                 };
+                if inst.opcode == 19 {
+                    let a = taddr as i64;
+                    let b = addr as i64;
+                    let a = a - b;
+                    let a = a as i32;
+                    let a = a as u32;
+                    let a = a as u64;
+                    taddr = a;
+                }
                 // bytes sequence
                 let bseq = [
-                    addr as u8,
-                    (addr >> 8) as u8,
-                    (addr >> 16) as u8,
-                    (addr >> 24) as u8,
-                    (addr >> 32) as u8,
-                    (addr >> 40) as u8,
-                    (addr >> 48) as u8,
-                    (addr >> 56) as u8,
+                    taddr as u8,
+                    (taddr >> 8) as u8,
+                    (taddr >> 16) as u8,
+                    (taddr >> 24) as u8,
+                    (taddr >> 32) as u8,
+                    (taddr >> 40) as u8,
+                    (taddr >> 48) as u8,
+                    (taddr >> 56) as u8,
                 ];
                 for i in 0..*length {
                     inst.oprands[*starts + i] = bseq[i];
