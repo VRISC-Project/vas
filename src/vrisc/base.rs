@@ -406,7 +406,7 @@ pub fn i_jc(
     refill_table: &mut HashMap<usize, ((usize, usize), String)>,
     inst_num: usize,
 ) -> Instruction {
-    let w = get_wide(&asm[0]);
+    let w = get_wide(&asm[0]) - 1;
     let c = get_condition_code(&mut asm[0].clone()) << 4;
     if asm[1].starts_with("*") {
         let nn = String::from_utf8(asm[1].as_bytes()[1..].to_vec()).unwrap();
@@ -479,7 +479,7 @@ pub fn i_cc(
     refill_table: &mut HashMap<usize, ((usize, usize), String)>,
     inst_num: usize,
 ) -> Instruction {
-    let w = get_wide(&asm[0]);
+    let w = get_wide(&asm[0]) - 1;
     let c = get_condition_code(&mut asm[0].clone()) << 4;
     if asm[1].starts_with("*") {
         let nn = String::from_utf8(asm[1].as_bytes()[1..].to_vec()).unwrap();
@@ -884,12 +884,4 @@ pub fn i_destext(
         opcode: 0x3e,
         oprands: vec![],
     }
-}
-
-pub fn i_3f(
-    _asm: Vec<String>,
-    _refill_table: &mut HashMap<usize, ((usize, usize), String)>,
-    _inst_num: usize,
-) -> Instruction {
-    todo!();
 }
