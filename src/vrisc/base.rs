@@ -634,46 +634,82 @@ pub fn i_ldi(
 ) -> Instruction {
     let w = get_wide(&asm[0]);
     let r = get_register_code(&asm[2]) << 4;
-    if !asm[1].starts_with("$") {
+    if !asm[1].starts_with("$") && !asm[1].starts_with("*") {
         panic!("Invalid oprand {} for ldi.", asm[1]);
     }
     let nn = String::from_utf8(asm[1].as_bytes().split_at(1).1.to_vec()).unwrap();
-    let num: u64 = nn.parse().unwrap();
-    match w {
-        0 => Instruction {
-            opcode: 0x20,
-            oprands: vec![r | w, num as u8],
-        },
+    if asm[1].starts_with("$") {
+        let num: u64 = nn.parse().unwrap();
+        match w {
+            0 => Instruction {
+                opcode: 0x20,
+                oprands: vec![r | w, num as u8],
+            },
 
-        1 => Instruction {
-            opcode: 0x20,
-            oprands: vec![r | w, num as u8, (num >> 8) as u8],
-        },
-        2 => Instruction {
-            opcode: 0x20,
-            oprands: vec![
-                r | w,
-                num as u8,
-                (num >> 8) as u8,
-                (num >> 16) as u8,
-                (num >> 24) as u8,
-            ],
-        },
-        3 => Instruction {
-            opcode: 0x20,
-            oprands: vec![
-                r | w,
-                (num >> 8) as u8,
-                (num >> 16) as u8,
-                (num >> 24) as u8,
-                (num >> 32) as u8,
-                (num >> 40) as u8,
-                (num >> 48) as u8,
-                (num >> 56) as u8,
-                0,
-            ],
-        },
-        _ => todo!(),
+            1 => Instruction {
+                opcode: 0x20,
+                oprands: vec![r | w, num as u8, (num >> 8) as u8],
+            },
+            2 => Instruction {
+                opcode: 0x20,
+                oprands: vec![
+                    r | w,
+                    num as u8,
+                    (num >> 8) as u8,
+                    (num >> 16) as u8,
+                    (num >> 24) as u8,
+                ],
+            },
+            3 => Instruction {
+                opcode: 0x20,
+                oprands: vec![
+                    r | w,
+                    num as u8,
+                    (num >> 8) as u8,
+                    (num >> 16) as u8,
+                    (num >> 24) as u8,
+                    (num >> 32) as u8,
+                    (num >> 40) as u8,
+                    (num >> 48) as u8,
+                    (num >> 56) as u8,
+                ],
+            },
+            _ => todo!(),
+        }
+    } else {
+        refill_table.insert(
+            inst_num,
+            (
+                (1, {
+                    let mut n = 1usize;
+                    for _ in 0..w {
+                        n *= 2;
+                    }
+                    n
+                }),
+                nn,
+            ),
+        );
+        match w {
+            0 => Instruction {
+                opcode: 0x20,
+                oprands: vec![r | w, 0],
+            },
+
+            1 => Instruction {
+                opcode: 0x20,
+                oprands: vec![r | w, 0, 0],
+            },
+            2 => Instruction {
+                opcode: 0x20,
+                oprands: vec![r | w, 0, 0, 0, 0],
+            },
+            3 => Instruction {
+                opcode: 0x20,
+                oprands: vec![r | w, 0, 0, 0, 0, 0, 0, 0, 0],
+            },
+            _ => todo!(),
+        }
     }
 }
 

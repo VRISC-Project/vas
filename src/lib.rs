@@ -147,10 +147,10 @@ impl Assembler {
                 // 伪指令
                 else if line[0] == "db" {
                     line.remove(0);
-                    for opr in line {
-                        let opr = &opr.as_bytes()[1..];
+                    for opr_ in line {
+                        let opr = &opr_.as_bytes()[1..];
                         let opr = String::from_utf8(opr.to_vec()).unwrap();
-                        let i: u8 = if opr.starts_with("$") {
+                        let i: u8 = if opr_.starts_with("$") {
                             opr.csparse().unwrap()
                         } else {
                             self.refill_symbols
@@ -164,10 +164,10 @@ impl Assembler {
                     }
                 } else if line[0] == "dw" {
                     line.remove(0);
-                    for opr in line {
-                        let opr = &opr.as_bytes()[1..];
+                    for opr_ in line {
+                        let opr = &opr_.as_bytes()[1..];
                         let opr = String::from_utf8(opr.to_vec()).unwrap();
-                        let i: u16 = if opr.starts_with("$") {
+                        let i: u16 = if opr_.starts_with("$") {
                             opr.csparse().unwrap()
                         } else {
                             self.refill_symbols
@@ -181,10 +181,10 @@ impl Assembler {
                     }
                 } else if line[0] == "dd" {
                     line.remove(0);
-                    for opr in line {
-                        let opr = &opr.as_bytes()[1..];
+                    for opr_ in line {
+                        let opr = &opr_.as_bytes()[1..];
                         let opr = String::from_utf8(opr.to_vec()).unwrap();
-                        let i: u32 = if opr.starts_with("$") {
+                        let i: u32 = if opr_.starts_with("$") {
                             opr.csparse().unwrap()
                         } else {
                             self.refill_symbols
@@ -203,10 +203,10 @@ impl Assembler {
                     }
                 } else if line[0] == "dq" {
                     line.remove(0);
-                    for opr in line {
-                        let opr = &opr.as_bytes()[1..];
+                    for opr_ in line {
+                        let opr = &opr_.as_bytes()[1..];
                         let opr = String::from_utf8(opr.to_vec()).unwrap();
-                        let i: u64 = if opr.starts_with("$") {
+                        let i: u64 = if opr_.starts_with("$") {
                             opr.csparse().unwrap()
                         } else {
                             self.refill_symbols
@@ -392,6 +392,7 @@ impl Assembler {
                         if let Some(addr) = address_table.get(name) {
                             *addr
                         } else {
+                            println!("{},{:?}", i, self.refill_symbols.get(&(i as usize)));
                             panic!("Unknown symbol \"{}\"", name);
                         }
                     }
