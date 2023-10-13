@@ -100,13 +100,32 @@ fn trim_basestr(s: &String) -> String {
 
 pub fn is_number(num: &String) -> bool {
     let mut src = num.to_string();
-    let cs = if src.starts_with("0x") && trim_basestr(&src).chars().all(|c| c.is_digit(16)) {
+    let cs = if
+        src.starts_with("0x") &&
+        trim_basestr(&src)
+            .chars()
+            .all(|c| c.is_digit(16))
+    {
         16usize
-    } else if src.starts_with("0o") && trim_basestr(&src).chars().all(|c| c.is_digit(8)) {
+    } else if
+        src.starts_with("0o") &&
+        trim_basestr(&src)
+            .chars()
+            .all(|c| c.is_digit(8))
+    {
         8usize
-    } else if src.starts_with("0b") && trim_basestr(&src).chars().all(|c| c.is_digit(2)) {
+    } else if
+        src.starts_with("0b") &&
+        trim_basestr(&src)
+            .chars()
+            .all(|c| c.is_digit(2))
+    {
         2usize
-    } else if trim_basestr(&src).chars().all(|c| c.is_digit(10)) {
+    } else if
+        trim_basestr(&src)
+            .chars()
+            .all(|c| c.is_digit(10))
+    {
         10usize
     } else {
         0
@@ -159,18 +178,30 @@ pub fn is_number(num: &String) -> bool {
     }
 }
 
-impl<T: ToString, N: Num> CSParse<T, N> for T
-where
-    u64: Convert<N>,
-{
+impl<T: ToString, N: Num> CSParse<T, N> for T where u64: Convert<N> {
     fn csparse(&self) -> Result<N, CSParseError> {
         let mut src = self.to_string();
         let _ = src.trim();
-        let cs = if src.starts_with("0x") && trim_basestr(&src).chars().all(|c| c.is_digit(16)) {
+        let cs = if
+            src.starts_with("0x") &&
+            trim_basestr(&src)
+                .chars()
+                .all(|c| c.is_digit(16))
+        {
             16usize
-        } else if src.starts_with("0o") && trim_basestr(&src).chars().all(|c| c.is_digit(8)) {
+        } else if
+            src.starts_with("0o") &&
+            trim_basestr(&src)
+                .chars()
+                .all(|c| c.is_digit(8))
+        {
             8usize
-        } else if src.starts_with("0b") && trim_basestr(&src).chars().all(|c| c.is_digit(2)) {
+        } else if
+            src.starts_with("0b") &&
+            trim_basestr(&src)
+                .chars()
+                .all(|c| c.is_digit(2))
+        {
             2usize
         } else if src.chars().all(|c| c.is_digit(10)) {
             10usize
@@ -195,7 +226,7 @@ where
             }
             8 => {
                 let mut num = 0u64;
-                if src.len() > size_of::<N>() * 8 / 3 {
+                if src.len() > (size_of::<N>() * 8) / 3 {
                     Err(CSParseError::Overflow)
                 } else {
                     for &i in src.as_bytes() {
@@ -207,7 +238,7 @@ where
             }
             10 => {
                 let mut num = 0u64;
-                if src.len() > size_of::<N>() * 8 / 3 {
+                if src.len() > (size_of::<N>() * 8 + 3) / 3 {
                     Err(CSParseError::Overflow)
                 } else {
                     for &i in src.as_bytes() {
